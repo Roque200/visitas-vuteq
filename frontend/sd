@@ -1,0 +1,11 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=db.kyrfziwezqfudsoeounw.supabase.co;Port=5432;Database=postgres;Username=postgres;Pas
+;SSL Mode=Require;Trust Server Certificate=true;Pooling=true;No IPv6=true;"
+  },
+  "Jwt": {
+    "Key": "clave-secreta-super-larga-para-jwt-visitas-2025",
+    "Issuer": "VisitasAPI"
+  },
+  "AllowedHosts": "*"
+}

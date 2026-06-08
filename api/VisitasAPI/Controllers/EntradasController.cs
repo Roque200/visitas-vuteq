@@ -20,7 +20,11 @@ namespace VisitasAPI.Controllers
         {
             using var con = _db.GetConnection();
             await con.OpenAsync();
-            string query = "SELECT es.id, es.visita_id, es.fecha_entrada, es.fecha_salida, es.estatus, v.nombre_visitante, v.persona_visitar FROM entradas_salidas es INNER JOIN visitas v ON es.visita_id = v.id ORDER BY es.id DESC";
+            string query = @"SELECT es.id, es.visita_id, es.fecha_entrada, es.fecha_salida, es.estatus,
+                            v.nombre_visitante, v.persona_visitar, v.empresa
+                            FROM entradas_salidas es
+                            INNER JOIN visitas v ON es.visita_id = v.id
+                            ORDER BY es.id DESC";
             using var cmd = new NpgsqlCommand(query, con);
             using var reader = await cmd.ExecuteReaderAsync();
             var entradas = new List<object>();
@@ -34,7 +38,8 @@ namespace VisitasAPI.Controllers
                     fechaSalida = reader["fecha_salida"] == DBNull.Value ? null : Convert.ToDateTime(reader["fecha_salida"]).ToString("dd/MM/yyyy HH:mm"),
                     estatus = reader["estatus"].ToString(),
                     nombreVisitante = reader["nombre_visitante"].ToString(),
-                    personaVisitar = reader["persona_visitar"].ToString()
+                    personaVisitar = reader["persona_visitar"].ToString(),
+                    empresa = reader["empresa"].ToString()
                 });
             }
             return Ok(entradas);

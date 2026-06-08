@@ -1,10 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 interface Entrada {
   id: number
   visitaId: number
   nombreVisitante: string
+  empresa: string
   personaVisitar: string
   fechaEntrada: string
   fechaSalida: string | null
@@ -14,12 +15,15 @@ interface Entrada {
 export default function EntradasSalidasPage() {
   const [entradas, setEntradas] = useState<Entrada[]>([])
   const [loading, setLoading] = useState(true)
+  const [ultimaActualizacion, setUltimaActualizacion] = useState('')
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const cargarEntradas = async () => {
     try {
       const res = await fetch(`/api/entradas`)
       const data = await res.json()
       setEntradas(data)
+      setUltimaActualizacion(new Date().toLocaleTimeString())
     } catch {
       console.error('Error al cargar entradas')
     } finally {
@@ -27,7 +31,30 @@ export default function EntradasSalidasPage() {
     }
   }
 
-  useEffect(() => { cargarEntradas() }, [])
+  const programarRefresh = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current)
+
+    const ahora = new Date()
+    const hora = ahora.getHours()
+
+    // Solo hacer auto-refresh entre 5am y 11pm
+    if (hora >= 5 && hora < 23) {
+      intervalRef.current = setInterval(() => {
+        const horaActual = new Date().getHours()
+        if (horaActual >= 5 && horaActual < 23) {
+          cargarEntradas()
+        }
+      }, 15 * 60 * 1000) // cada 15 minutos
+    }
+  }
+
+  useEffect(() => {
+    cargarEntradas()
+    programarRefresh()
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [])
 
   const darSalida = async (id: number) => {
     if (!confirm('¿Registrar salida de este visitante?')) return
@@ -38,11 +65,12 @@ export default function EntradasSalidasPage() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold text-gray-800">Entradas y Salidas</h2>
-        <button onClick={cargarEntradas}
-          className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-500">
-          Refrescar
-        </button>
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800">Entradas y Salidas</h2>
+          {ultimaActualizacion && (
+            <p className="text-xs text-gray-400 mt-1">Última actualización: {ultimaActualizacion}</p>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -54,6 +82,7 @@ export default function EntradasSalidasPage() {
               <tr>
                 <th className="px-4 py-3 text-left">#</th>
                 <th className="px-4 py-3 text-left">Nombre del Visitante</th>
+                <th className="px-4 py-3 text-left">Empresa</th>
                 <th className="px-4 py-3 text-left">Fecha de Entrada</th>
                 <th className="px-4 py-3 text-left">Fecha de Salida</th>
                 <th className="px-4 py-3 text-left">Solicitado por</th>
@@ -66,6 +95,7 @@ export default function EntradasSalidasPage() {
                 <tr key={e.id} className="border-t border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-800">{i + 1}</td>
                   <td className="px-4 py-3 text-gray-800 font-medium">{e.nombreVisitante}</td>
+                  <td className="px-4 py-3 text-gray-800">{e.empresa}</td>
                   <td className="px-4 py-3 text-gray-800">{e.fechaEntrada}</td>
                   <td className="px-4 py-3 text-gray-800">{e.fechaSalida ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-800">{e.personaVisitar}</td>
@@ -88,7 +118,7 @@ export default function EntradasSalidasPage() {
               ))}
               {entradas.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-gray-400">No hay registros.</td>
+                  <td colSpan={8} className="px-4 py-6 text-center text-gray-400">No hay registros.</td>
                 </tr>
               )}
             </tbody>

@@ -14,7 +14,7 @@ namespace VisitasAPI.Controllers
         {
             using var con = _db.GetConnection();
             await con.OpenAsync();
-            string query = "SELECT es.id, es.visita_id, es.fecha_entrada, es.fecha_salida, es.estatus, v.nombre_visitante, v.persona_visitar, v.empresa FROM entradas_salidas es INNER JOIN visitas v ON es.visita_id = v.id ORDER BY es.id DESC";
+            string query = "SELECT es.id, es.visita_id, es.fecha_entrada, es.fecha_salida, es.estatus, v.nombre_visitante, v.persona_visitar, v.empresa FROM entradas_salidas es INNER JOIN visitas v ON es.visita_id = v.id WHERE DATE(es.fecha_entrada) = CURRENT_DATE ORDER BY es.id DESC";
             using var cmd = new NpgsqlCommand(query, con);
             using var reader = await cmd.ExecuteReaderAsync();
             var entradas = new List<object>();

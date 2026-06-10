@@ -44,7 +44,6 @@ export default function EntradasSalidasPage() {
       const hoy = new Date().toISOString().split('T')[0]
       const res = await fetch(`/api/visitas`)
       const data = await res.json()
-      // Filtrar visitas de hoy que no sean "Usada"
       const visitasHoy = data.filter((v: Visita) => {
         const partes = v.fecha.split('/')
         const fechaVisita = `${partes[2]}-${partes[1]}-${partes[0]}`
@@ -61,20 +60,16 @@ export default function EntradasSalidasPage() {
 
   const programarSiguienteRefresh = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
-
     const ahora = new Date()
     const minutos = ahora.getMinutes()
     const segundos = ahora.getSeconds()
     const milisegundos = ahora.getMilliseconds()
-
-    // Calcular cuántos minutos faltan para el siguiente múltiplo de 15
     const minutosParaSiguiente = 15 - (minutos % 15)
     const msParaSiguiente = (minutosParaSiguiente * 60 - segundos) * 1000 - milisegundos
-
     timeoutRef.current = setTimeout(() => {
       cargarProximasVisitas()
       cargarEntradas()
-      programarSiguienteRefresh() // Programa el siguiente
+      programarSiguienteRefresh()
     }, msParaSiguiente)
   }
 
@@ -82,7 +77,6 @@ export default function EntradasSalidasPage() {
     cargarEntradas()
     cargarProximasVisitas()
     programarSiguienteRefresh()
-
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
     }
@@ -102,8 +96,9 @@ export default function EntradasSalidasPage() {
 
   return (
     <div className="p-6">
-            {/* Tabla Entradas y Salidas */}
-      <div>
+
+      {/* Tabla Entradas y Salidas */}
+      <div className="mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-3">Entradas y Salidas</h2>
         <div className="bg-white rounded-xl shadow overflow-hidden">
           <table className="w-full text-sm">
@@ -154,8 +149,9 @@ export default function EntradasSalidasPage() {
           </table>
         </div>
       </div>
+
       {/* Tabla Próximas Visitas del Día */}
-      <div className="mb-8">
+      <div>
         <div className="flex justify-between items-center mb-3">
           <div>
             <h2 className="text-xl font-semibold text-gray-800">Próximas Visitas del Día</h2>

@@ -140,12 +140,10 @@ namespace VisitasAPI.Controllers
         {
             using var con = _db.GetConnection();
             await con.OpenAsync();
-            // Primero eliminar entradas relacionadas
             string deleteEntradas = "DELETE FROM entradas_salidas WHERE visita_id = @id";
             using var cmdEntradas = new NpgsqlCommand(deleteEntradas, con);
             cmdEntradas.Parameters.AddWithValue("@id", id);
             await cmdEntradas.ExecuteNonQueryAsync();
-            // Luego eliminar la visita
             string query = "DELETE FROM visitas WHERE id = @id";
             using var cmd = new NpgsqlCommand(query, con);
             cmd.Parameters.AddWithValue("@id", id);
@@ -159,8 +157,6 @@ namespace VisitasAPI.Controllers
         {
             using var con = _db.GetConnection();
             await con.OpenAsync();
-
-            // Validar que el QR exista, esté confirmado y no usado
             string query = "SELECT id, nombre_visitante, fecha, estatus FROM visitas WHERE codigo_qr = @qr";
             using var cmd = new NpgsqlCommand(query, con);
             cmd.Parameters.AddWithValue("@qr", body.Codigo);
@@ -175,16 +171,13 @@ namespace VisitasAPI.Controllers
             var fechaVisita = reader["fecha"] is DateOnly d ? d : DateOnly.FromDateTime(Convert.ToDateTime(reader["fecha"]));
             await reader.CloseAsync();
 
-            // Validar estatus
             if (estatus != "Confirmada")
                 return BadRequest(new { success = false, message = "La visita no está confirmada." });
 
-            // Validar que sea el día correcto
-            var hoy = DateOnly.FromDateTime(DateTime.Now);
+            var hoy = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("America/Mexico_City")));
             if (fechaVisita != hoy)
                 return BadRequest(new { success = false, message = $"Este QR es válido solo para el {fechaVisita:dd/MM/yyyy}. Hoy es {hoy:dd/MM/yyyy}." });
 
-            // Validar que no haya sido usado ya
             string checkQuery = "SELECT COUNT(*) FROM entradas_salidas WHERE visita_id = @id";
             using var checkCmd = new NpgsqlCommand(checkQuery, con);
             checkCmd.Parameters.AddWithValue("@id", visitaId);
@@ -192,13 +185,11 @@ namespace VisitasAPI.Controllers
             if (usos > 0)
                 return BadRequest(new { success = false, message = "Este código QR ya fue utilizado." });
 
-            // Registrar entrada y marcar QR como usado
-            string insertQuery = "INSERT INTO entradas_salidas (visita_id, fecha_entrada, estatus) VALUES (@id, NOW(), 'En planta')";
+            string insertQuery = "INSERT INTO entradas_salidas (visita_id, fecha_entrada, estatus) VALUES (@id, NOW() AT TIME ZONE 'America/Mexico_City', 'En planta')";
             using var insertCmd = new NpgsqlCommand(insertQuery, con);
             insertCmd.Parameters.AddWithValue("@id", visitaId);
             await insertCmd.ExecuteNonQueryAsync();
 
-            // Cambiar estatus a Usada para que no se pueda volver a escanear
             string updateQuery = "UPDATE visitas SET estatus = 'Usada' WHERE id = @id";
             using var updateCmd = new NpgsqlCommand(updateQuery, con);
             updateCmd.Parameters.AddWithValue("@id", visitaId);

@@ -24,8 +24,10 @@ interface Reporte {
 export default function VisitasPage() {
   const router = useRouter()
   const [visitas, setVisitas] = useState<Visita[]>([])
+  const [visitasFiltradas, setVisitasFiltradas] = useState<Visita[]>([])
   const [loading, setLoading] = useState(true)
   const [rol, setRol] = useState('')
+  const [filtroAplicado, setFiltroAplicado] = useState(false)
 
   // Filtros
   const [tipoFiltro, setTipoFiltro] = useState<'rango' | 'dia' | 'mes'>('rango')
@@ -47,11 +49,47 @@ export default function VisitasPage() {
       const res = await fetch(`/api/visitas`)
       const data = await res.json()
       setVisitas(data)
+      setVisitasFiltradas(data)
     } catch {
       console.error('Error al cargar visitas')
     } finally {
       setLoading(false)
     }
+  }
+
+  const aplicarFiltro = () => {
+    let filtradas = [...visitas]
+
+    if (tipoFiltro === 'dia' && diaEspecifico) {
+      const partes = diaEspecifico.split('-')
+      const fechaFormateada = `${partes[2]}/${partes[1]}/${partes[0]}`
+      filtradas = visitas.filter(v => v.fecha === fechaFormateada)
+    } else if (tipoFiltro === 'rango' && desde && hasta) {
+      const desdeDate = new Date(desde)
+      const hastaDate = new Date(hasta)
+      filtradas = visitas.filter(v => {
+        const partes = v.fecha.split('/')
+        const fechaVisita = new Date(`${partes[2]}-${partes[1]}-${partes[0]}`)
+        return fechaVisita >= desdeDate && fechaVisita <= hastaDate
+      })
+    } else if (tipoFiltro === 'mes' && mes && anio) {
+      filtradas = visitas.filter(v => {
+        const partes = v.fecha.split('/')
+        return partes[1] === mes.padStart(2, '0') && partes[2] === anio
+      })
+    }
+
+    setVisitasFiltradas(filtradas)
+    setFiltroAplicado(true)
+  }
+
+  const limpiarFiltro = () => {
+    setVisitasFiltradas(visitas)
+    setFiltroAplicado(false)
+    setDesde('')
+    setHasta('')
+    setDiaEspecifico('')
+    setMes('')
   }
 
   const eliminar = async (id: number) => {
@@ -90,7 +128,6 @@ export default function VisitasPage() {
         return
       }
 
-      // Formatear datos para Excel
       const filas = data.map((r, i) => ({
         '#': i + 1,
         'Nombre del Visitante': r.nombreVisitante,
@@ -103,17 +140,10 @@ export default function VisitasPage() {
       const worksheet = XLSX.utils.json_to_sheet(filas)
       const workbook = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Visitas')
-
-      // Ajustar ancho de columnas
       worksheet['!cols'] = [
-        { wch: 5 },
-        { wch: 30 },
-        { wch: 25 },
-        { wch: 20 },
-        { wch: 20 },
-        { wch: 25 }
+        { wch: 5 }, { wch: 30 }, { wch: 25 },
+        { wch: 20 }, { wch: 20 }, { wch: 25 }
       ]
-
       const nombreArchivo = `Reporte_Visitas_${new Date().toISOString().split('T')[0]}.xlsx`
       XLSX.writeFile(workbook, nombreArchivo)
     } catch {
@@ -140,7 +170,7 @@ export default function VisitasPage() {
   ]
 
   return (
-    <div className="p-6">
+    <div className="p-6 h-full flex flex-col">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-800">Listado de Visitas</h2>
         {rol === 'admin' && (
@@ -151,30 +181,28 @@ export default function VisitasPage() {
         )}
       </div>
 
-      {/* Panel de filtros y exportación */}
+      {/* Panel de filtros */}
       {rol === 'admin' && (
         <div className="bg-white rounded-xl shadow p-4 mb-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Exportar reporte a Excel</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Filtrar visitas</h3>
 
-          {/* Selector tipo de filtro */}
           <div className="flex gap-2 mb-3">
-            <button onClick={() => setTipoFiltro('rango')}
+            <button onClick={() => { setTipoFiltro('rango'); setFiltroAplicado(false) }}
               className={`px-3 py-1 rounded text-sm font-medium ${tipoFiltro === 'rango' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               Rango de fechas
             </button>
-            <button onClick={() => setTipoFiltro('dia')}
+            <button onClick={() => { setTipoFiltro('dia'); setFiltroAplicado(false) }}
               className={`px-3 py-1 rounded text-sm font-medium ${tipoFiltro === 'dia' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               Día específico
             </button>
-            <button onClick={() => setTipoFiltro('mes')}
+            <button onClick={() => { setTipoFiltro('mes'); setFiltroAplicado(false) }}
               className={`px-3 py-1 rounded text-sm font-medium ${tipoFiltro === 'mes' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               Por mes
             </button>
           </div>
 
-          {/* Filtro rango */}
           {tipoFiltro === 'rango' && (
-            <div className="flex gap-3 items-end">
+            <div className="flex gap-3 items-end flex-wrap">
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Desde</label>
                 <input type="date" value={desde} onChange={e => setDesde(e.target.value)}
@@ -185,31 +213,45 @@ export default function VisitasPage() {
                 <input type="date" value={hasta} onChange={e => setHasta(e.target.value)}
                   className="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800" />
               </div>
+              <button onClick={aplicarFiltro} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-blue-500">
+                Filtrar
+              </button>
               <button onClick={exportarExcel} disabled={exportando}
-                className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-green-500 disabled:opacity-50 flex items-center gap-2">
+                className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-green-500 disabled:opacity-50">
                 {exportando ? 'Generando...' : '📥 Exportar Excel'}
               </button>
+              {filtroAplicado && (
+                <button onClick={limpiarFiltro} className="bg-gray-400 text-white px-4 py-1.5 rounded text-sm hover:bg-gray-500">
+                  Limpiar filtro
+                </button>
+              )}
             </div>
           )}
 
-          {/* Filtro día específico */}
           {tipoFiltro === 'dia' && (
-            <div className="flex gap-3 items-end">
+            <div className="flex gap-3 items-end flex-wrap">
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Fecha</label>
                 <input type="date" value={diaEspecifico} onChange={e => setDiaEspecifico(e.target.value)}
                   className="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800" />
               </div>
+              <button onClick={aplicarFiltro} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-blue-500">
+                Filtrar
+              </button>
               <button onClick={exportarExcel} disabled={exportando}
-                className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-green-500 disabled:opacity-50 flex items-center gap-2">
+                className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-green-500 disabled:opacity-50">
                 {exportando ? 'Generando...' : '📥 Exportar Excel'}
               </button>
+              {filtroAplicado && (
+                <button onClick={limpiarFiltro} className="bg-gray-400 text-white px-4 py-1.5 rounded text-sm hover:bg-gray-500">
+                  Limpiar filtro
+                </button>
+              )}
             </div>
           )}
 
-          {/* Filtro por mes */}
           {tipoFiltro === 'mes' && (
-            <div className="flex gap-3 items-end">
+            <div className="flex gap-3 items-end flex-wrap">
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Mes</label>
                 <select value={mes} onChange={e => setMes(e.target.value)}
@@ -225,68 +267,86 @@ export default function VisitasPage() {
                 <input type="number" value={anio} onChange={e => setAnio(e.target.value)}
                   className="border border-gray-300 rounded px-3 py-1.5 text-sm text-gray-800 w-24" />
               </div>
+              <button onClick={aplicarFiltro} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-blue-500">
+                Filtrar
+              </button>
               <button onClick={exportarExcel} disabled={exportando}
-                className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-green-500 disabled:opacity-50 flex items-center gap-2">
+                className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-green-500 disabled:opacity-50">
                 {exportando ? 'Generando...' : '📥 Exportar Excel'}
               </button>
+              {filtroAplicado && (
+                <button onClick={limpiarFiltro} className="bg-gray-400 text-white px-4 py-1.5 rounded text-sm hover:bg-gray-500">
+                  Limpiar filtro
+                </button>
+              )}
             </div>
+          )}
+
+          {filtroAplicado && (
+            <p className="text-xs text-gray-500 mt-2">
+              Mostrando {visitasFiltradas.length} de {visitas.length} registros
+            </p>
           )}
         </div>
       )}
 
-      {/* Tabla de visitas */}
+      {/* Tabla con scroll */}
       {loading ? (
         <p className="text-gray-500">Cargando...</p>
       ) : (
-        <div className="bg-white rounded-xl shadow overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100 text-gray-700 font-semibold">
-              <tr>
-                <th className="px-4 py-3 text-left">#</th>
-                <th className="px-4 py-3 text-left">Nombre del Visitante</th>
-                <th className="px-4 py-3 text-left">Empresa</th>
-                <th className="px-4 py-3 text-left">Fecha de Entrada</th>
-                <th className="px-4 py-3 text-left">Solicitado por</th>
-                <th className="px-4 py-3 text-left">Estatus</th>
-                {rol === 'admin' && <th className="px-4 py-3 text-left">Acciones</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {visitas.map((v, i) => (
-                <tr key={v.id} className="border-t border-gray-100 hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-800">{i + 1}</td>
-                  <td className="px-4 py-3 text-gray-800 font-medium">{v.nombreVisitante}</td>
-                  <td className="px-4 py-3 text-gray-800">{v.empresa}</td>
-                  <td className="px-4 py-3 text-gray-800">{v.fecha} {v.horaEntrada}</td>
-                  <td className="px-4 py-3 text-gray-800">{v.personaVisitar}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${colorEstatus(v.estatus)}`}>
-                      {v.estatus}
-                    </span>
-                  </td>
-                  {rol === 'admin' && (
-                    <td className="px-4 py-3 flex gap-2">
-                      {v.estatus === 'Pendiente' && (
-                        <button onClick={() => router.push(`/visitas/confirmacion?id=${v.id}`)}
-                          className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-500">
-                          Ver
-                        </button>
-                      )}
-                      <button onClick={() => eliminar(v.id)}
-                        className="bg-red-600 text-white px-3 py-1 rounded text-xs hover:bg-red-500">
-                        Eliminar
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {visitas.length === 0 && (
+        <div className="bg-white rounded-xl shadow overflow-hidden flex-1">
+          <div className="overflow-y-auto max-h-[calc(100vh-380px)]">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-100 text-gray-700 font-semibold sticky top-0">
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-gray-400">No hay visitas registradas.</td>
+                  <th className="px-4 py-3 text-left">#</th>
+                  <th className="px-4 py-3 text-left">Nombre del Visitante</th>
+                  <th className="px-4 py-3 text-left">Empresa</th>
+                  <th className="px-4 py-3 text-left">Fecha de Entrada</th>
+                  <th className="px-4 py-3 text-left">Solicitado por</th>
+                  <th className="px-4 py-3 text-left">Estatus</th>
+                  {rol === 'admin' && <th className="px-4 py-3 text-left">Acciones</th>}
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {visitasFiltradas.map((v, i) => (
+                  <tr key={v.id} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-800">{i + 1}</td>
+                    <td className="px-4 py-3 text-gray-800 font-medium">{v.nombreVisitante}</td>
+                    <td className="px-4 py-3 text-gray-800">{v.empresa}</td>
+                    <td className="px-4 py-3 text-gray-800">{v.fecha} {v.horaEntrada}</td>
+                    <td className="px-4 py-3 text-gray-800">{v.personaVisitar}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${colorEstatus(v.estatus)}`}>
+                        {v.estatus}
+                      </span>
+                    </td>
+                    {rol === 'admin' && (
+                      <td className="px-4 py-3 flex gap-2">
+                        {v.estatus === 'Pendiente' && (
+                          <button onClick={() => router.push(`/visitas/confirmacion?id=${v.id}`)}
+                            className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-500">
+                            Ver
+                          </button>
+                        )}
+                        <button onClick={() => eliminar(v.id)}
+                          className="bg-red-600 text-white px-3 py-1 rounded text-xs hover:bg-red-500">
+                          Eliminar
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+                {visitasFiltradas.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-6 text-center text-gray-400">
+                      {filtroAplicado ? 'No hay visitas para el período seleccionado.' : 'No hay visitas registradas.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

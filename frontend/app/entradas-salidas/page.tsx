@@ -29,23 +29,23 @@ export default function EntradasSalidasPage() {
   const [ultimaActualizacion, setUltimaActualizacion] = useState('')
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const getHoy = () => {
+  const getHoyFormato = () => {
     const ahora = new Date()
-    ahora.setHours(ahora.getHours() - 6)
-    return ahora.toISOString().split('T')[0]
+    const dia = ahora.getDate().toString().padStart(2, '0')
+    const mes = (ahora.getMonth() + 1).toString().padStart(2, '0')
+    const anio = ahora.getFullYear()
+    return `${dia}/${mes}/${anio}`
   }
 
   const cargarEntradas = async () => {
     try {
       const res = await fetch(`/api/entradas`)
       const data = await res.json()
-      const hoy = getHoy()
-      // Filtrar solo los de hoy con estatus En planta o Salio
+      const hoy = getHoyFormato()
       const entradasHoy = data.filter((e: Entrada) => {
         if (!e.fechaEntrada) return false
-        const partes = e.fechaEntrada.split(' ')[0].split('/')
-        const fechaEntrada = `${partes[2]}-${partes[1]}-${partes[0]}`
-        return fechaEntrada === hoy
+        const fechaSolo = e.fechaEntrada.split(' ')[0]
+        return fechaSolo === hoy
       })
       setEntradas(entradasHoy)
     } catch {
@@ -55,35 +55,27 @@ export default function EntradasSalidasPage() {
 
   const cargarProximasVisitas = async () => {
     try {
-      const hoy = getHoy()
+      const hoy = getHoyFormato()
       const res = await fetch(`/api/visitas`)
       const data = await res.json()
-      const ultimoIntervalo = getUltimoIntervalo()
 
       const visitasHoy = data.filter((v: Visita) => {
-        const partes = v.fecha.split('/')
-        const fechaVisita = `${partes[2]}-${partes[1]}-${partes[0]}`
-        if (fechaVisita !== hoy) return false
-        // Solo Pendiente, Confirmada, Rechazada — NO Usada
+        if (v.fecha !== hoy) return false
         return ['Pendiente', 'Confirmada', 'Rechazada'].includes(v.estatus)
       })
 
       setProximasVisitas(visitasHoy)
-      setUltimaActualizacion(ultimoIntervalo.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }))
+      const ahora = new Date()
+      const minutos = ahora.getMinutes()
+      const minutosRedondeados = Math.floor(minutos / 15) * 15
+      const intervalo = new Date(ahora)
+      intervalo.setMinutes(minutosRedondeados, 0, 0)
+      setUltimaActualizacion(intervalo.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }))
     } catch {
       console.error('Error al cargar próximas visitas')
     } finally {
       setLoading(false)
     }
-  }
-
-  const getUltimoIntervalo = () => {
-    const ahora = new Date()
-    const minutos = ahora.getMinutes()
-    const minutosRedondeados = Math.floor(minutos / 15) * 15
-    const ultimoIntervalo = new Date(ahora)
-    ultimoIntervalo.setMinutes(minutosRedondeados, 0, 0)
-    return ultimoIntervalo
   }
 
   const programarSiguienteRefresh = () => {
@@ -126,8 +118,6 @@ export default function EntradasSalidasPage() {
 
   return (
     <div className="p-6">
-
-      {/* Tabla Entradas y Salidas */}
       <div className="mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-3">Entradas y Salidas</h2>
         <div className="bg-white rounded-xl shadow overflow-hidden">
@@ -180,7 +170,6 @@ export default function EntradasSalidasPage() {
         </div>
       </div>
 
-      {/* Tabla Próximas Visitas del Día */}
       <div>
         <div className="flex justify-between items-center mb-3">
           <div>
@@ -192,7 +181,6 @@ export default function EntradasSalidasPage() {
             )}
           </div>
         </div>
-
         {loading ? (
           <p className="text-gray-500">Cargando...</p>
         ) : (

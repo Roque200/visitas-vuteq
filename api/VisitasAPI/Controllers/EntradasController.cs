@@ -14,7 +14,14 @@ namespace VisitasAPI.Controllers
         {
             using var con = _db.GetConnection();
             await con.OpenAsync();
-            string query = "SELECT es.id, es.visita_id, es.fecha_entrada AT TIME ZONE 'America/Mexico_City' as fecha_entrada, es.fecha_salida AT TIME ZONE 'America/Mexico_City' as fecha_salida, es.estatus, v.nombre_visitante, v.persona_visitar, v.empresa FROM entradas_salidas es INNER JOIN visitas v ON es.visita_id = v.id WHERE DATE(es.fecha_entrada AT TIME ZONE 'America/Mexico_City') = CURRENT_DATE AT TIME ZONE 'America/Mexico_City' ORDER BY es.id DESC";
+            string query = @"SELECT es.id, es.visita_id,
+                (es.fecha_entrada - INTERVAL '6 hours') as fecha_entrada,
+                (es.fecha_salida - INTERVAL '6 hours') as fecha_salida,
+                es.estatus, v.nombre_visitante, v.persona_visitar, v.empresa
+                FROM entradas_salidas es
+                INNER JOIN visitas v ON es.visita_id = v.id
+                WHERE DATE(es.fecha_entrada - INTERVAL '6 hours') = CURRENT_DATE - INTERVAL '6 hours'
+                ORDER BY es.id DESC";
             using var cmd = new NpgsqlCommand(query, con);
             using var reader = await cmd.ExecuteReaderAsync();
             var entradas = new List<object>();
@@ -38,7 +45,7 @@ namespace VisitasAPI.Controllers
         {
             using var con = _db.GetConnection();
             await con.OpenAsync();
-            string query = "UPDATE entradas_salidas SET fecha_salida = NOW() AT TIME ZONE 'America/Mexico_City', estatus = 'Salio' WHERE id = @id";
+            string query = "UPDATE entradas_salidas SET fecha_salida = NOW(), estatus = 'Salio' WHERE id = @id";
             using var cmd = new NpgsqlCommand(query, con);
             cmd.Parameters.AddWithValue("@id", id);
             await cmd.ExecuteNonQueryAsync();

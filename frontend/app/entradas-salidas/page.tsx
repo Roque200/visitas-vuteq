@@ -29,21 +29,25 @@ export default function EntradasSalidasPage() {
   const [ultimaActualizacion, setUltimaActualizacion] = useState('')
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Calcula el timestamp del último múltiplo de 15 minutos pasado
-  const getUltimoIntervalo = () => {
+  const getHoy = () => {
     const ahora = new Date()
-    const minutos = ahora.getMinutes()
-    const minutosRedondeados = Math.floor(minutos / 15) * 15
-    const ultimoIntervalo = new Date(ahora)
-    ultimoIntervalo.setMinutes(minutosRedondeados, 0, 0)
-    return ultimoIntervalo
+    ahora.setHours(ahora.getHours() - 6)
+    return ahora.toISOString().split('T')[0]
   }
 
   const cargarEntradas = async () => {
     try {
       const res = await fetch(`/api/entradas`)
       const data = await res.json()
-      setEntradas(data)
+      const hoy = getHoy()
+      // Filtrar solo los de hoy con estatus En planta o Salio
+      const entradasHoy = data.filter((e: Entrada) => {
+        if (!e.fechaEntrada) return false
+        const partes = e.fechaEntrada.split(' ')[0].split('/')
+        const fechaEntrada = `${partes[2]}-${partes[1]}-${partes[0]}`
+        return fechaEntrada === hoy
+      })
+      setEntradas(entradasHoy)
     } catch {
       console.error('Error al cargar entradas')
     }
@@ -51,7 +55,7 @@ export default function EntradasSalidasPage() {
 
   const cargarProximasVisitas = async () => {
     try {
-      const hoy = new Date().toISOString().split('T')[0]
+      const hoy = getHoy()
       const res = await fetch(`/api/visitas`)
       const data = await res.json()
       const ultimoIntervalo = getUltimoIntervalo()
@@ -60,8 +64,8 @@ export default function EntradasSalidasPage() {
         const partes = v.fecha.split('/')
         const fechaVisita = `${partes[2]}-${partes[1]}-${partes[0]}`
         if (fechaVisita !== hoy) return false
-        if (v.estatus === 'Usada') return false
-        return true
+        // Solo Pendiente, Confirmada, Rechazada — NO Usada
+        return ['Pendiente', 'Confirmada', 'Rechazada'].includes(v.estatus)
       })
 
       setProximasVisitas(visitasHoy)
@@ -73,6 +77,15 @@ export default function EntradasSalidasPage() {
     }
   }
 
+  const getUltimoIntervalo = () => {
+    const ahora = new Date()
+    const minutos = ahora.getMinutes()
+    const minutosRedondeados = Math.floor(minutos / 15) * 15
+    const ultimoIntervalo = new Date(ahora)
+    ultimoIntervalo.setMinutes(minutosRedondeados, 0, 0)
+    return ultimoIntervalo
+  }
+
   const programarSiguienteRefresh = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
     const ahora = new Date()
@@ -81,7 +94,6 @@ export default function EntradasSalidasPage() {
     const milisegundos = ahora.getMilliseconds()
     const minutosParaSiguiente = 15 - (minutos % 15)
     const msParaSiguiente = (minutosParaSiguiente * 60 - segundos) * 1000 - milisegundos
-
     timeoutRef.current = setTimeout(() => {
       cargarProximasVisitas()
       cargarEntradas()
@@ -107,7 +119,9 @@ export default function EntradasSalidasPage() {
   const colorEstatus = (estatus: string) => {
     if (estatus === 'Confirmada') return 'bg-green-100 text-green-700'
     if (estatus === 'Rechazada') return 'bg-red-100 text-red-700'
-    return 'bg-yellow-100 text-yellow-700'
+    if (estatus === 'Pendiente') return 'bg-yellow-100 text-yellow-700'
+    if (estatus === 'En planta') return 'bg-green-100 text-green-700'
+    return 'bg-gray-200 text-gray-700'
   }
 
   return (
@@ -140,7 +154,7 @@ export default function EntradasSalidasPage() {
                   <td className="px-4 py-3 text-gray-800">{e.fechaSalida ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-800">{e.personaVisitar}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${e.estatus === 'En planta' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'}`}>
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${colorEstatus(e.estatus)}`}>
                       {e.estatus}
                     </span>
                   </td>

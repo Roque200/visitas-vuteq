@@ -15,23 +15,27 @@ namespace VisitasAPI.Controllers
             using var con = _db.GetConnection();
             await con.OpenAsync();
             string query = @"SELECT es.id, es.visita_id,
-                (es.fecha_entrada - INTERVAL '6 hours') as fecha_entrada,
-                (es.fecha_salida - INTERVAL '6 hours') as fecha_salida,
-                es.estatus, v.nombre_visitante, v.persona_visitar, v.empresa
+                es.fecha_entrada,
+                es.fecha_salida,
+                es.estatus,
+                v.nombre_visitante, v.persona_visitar, v.empresa
                 FROM entradas_salidas es
                 INNER JOIN visitas v ON es.visita_id = v.id
-                WHERE DATE(es.fecha_entrada - INTERVAL '6 hours') = CURRENT_DATE - INTERVAL '6 hours'
                 ORDER BY es.id DESC";
             using var cmd = new NpgsqlCommand(query, con);
             using var reader = await cmd.ExecuteReaderAsync();
             var entradas = new List<object>();
             while (await reader.ReadAsync())
             {
+                var fechaEntrada = reader["fecha_entrada"] == DBNull.Value ? null :
+                    Convert.ToDateTime(reader["fecha_entrada"]).AddHours(-6).ToString("dd/MM/yyyy HH:mm");
+                var fechaSalida = reader["fecha_salida"] == DBNull.Value ? null :
+                    Convert.ToDateTime(reader["fecha_salida"]).AddHours(-6).ToString("dd/MM/yyyy HH:mm");
                 entradas.Add(new {
                     id = reader["id"],
                     visitaId = reader["visita_id"],
-                    fechaEntrada = reader["fecha_entrada"] == DBNull.Value ? null : Convert.ToDateTime(reader["fecha_entrada"]).ToString("dd/MM/yyyy HH:mm"),
-                    fechaSalida = reader["fecha_salida"] == DBNull.Value ? null : Convert.ToDateTime(reader["fecha_salida"]).ToString("dd/MM/yyyy HH:mm"),
+                    fechaEntrada = fechaEntrada,
+                    fechaSalida = fechaSalida,
                     estatus = reader["estatus"].ToString(),
                     nombreVisitante = reader["nombre_visitante"].ToString(),
                     personaVisitar = reader["persona_visitar"].ToString(),

@@ -29,6 +29,16 @@ export default function EntradasSalidasPage() {
   const [ultimaActualizacion, setUltimaActualizacion] = useState('')
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Calcula el timestamp del último múltiplo de 15 minutos pasado
+  const getUltimoIntervalo = () => {
+    const ahora = new Date()
+    const minutos = ahora.getMinutes()
+    const minutosRedondeados = Math.floor(minutos / 15) * 15
+    const ultimoIntervalo = new Date(ahora)
+    ultimoIntervalo.setMinutes(minutosRedondeados, 0, 0)
+    return ultimoIntervalo
+  }
+
   const cargarEntradas = async () => {
     try {
       const res = await fetch(`/api/entradas`)
@@ -44,13 +54,18 @@ export default function EntradasSalidasPage() {
       const hoy = new Date().toISOString().split('T')[0]
       const res = await fetch(`/api/visitas`)
       const data = await res.json()
+      const ultimoIntervalo = getUltimoIntervalo()
+
       const visitasHoy = data.filter((v: Visita) => {
         const partes = v.fecha.split('/')
         const fechaVisita = `${partes[2]}-${partes[1]}-${partes[0]}`
-        return fechaVisita === hoy && v.estatus !== 'Usada'
+        if (fechaVisita !== hoy) return false
+        if (v.estatus === 'Usada') return false
+        return true
       })
+
       setProximasVisitas(visitasHoy)
-      setUltimaActualizacion(new Date().toLocaleTimeString())
+      setUltimaActualizacion(ultimoIntervalo.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }))
     } catch {
       console.error('Error al cargar próximas visitas')
     } finally {
@@ -66,6 +81,7 @@ export default function EntradasSalidasPage() {
     const milisegundos = ahora.getMilliseconds()
     const minutosParaSiguiente = 15 - (minutos % 15)
     const msParaSiguiente = (minutosParaSiguiente * 60 - segundos) * 1000 - milisegundos
+
     timeoutRef.current = setTimeout(() => {
       cargarProximasVisitas()
       cargarEntradas()
@@ -142,7 +158,7 @@ export default function EntradasSalidasPage() {
               ))}
               {entradas.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-6 text-center text-gray-400">No hay registros.</td>
+                  <td colSpan={8} className="px-4 py-6 text-center text-gray-400">No hay registros hoy.</td>
                 </tr>
               )}
             </tbody>
@@ -156,7 +172,9 @@ export default function EntradasSalidasPage() {
           <div>
             <h2 className="text-xl font-semibold text-gray-800">Próximas Visitas del Día</h2>
             {ultimaActualizacion && (
-              <p className="text-xs text-gray-400 mt-1">Última actualización: {ultimaActualizacion}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Última actualización: {ultimaActualizacion} — se refresca en los minutos 00, 15, 30 y 45
+              </p>
             )}
           </div>
         </div>

@@ -29,6 +29,17 @@ export default function EntradasSalidasPage() {
   const [ultimaActualizacion, setUltimaActualizacion] = useState('')
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  const formatearFechaLocal = (isoString: string | null) => {
+    if (!isoString) return null
+    const fecha = new Date(isoString)
+    const dia = fecha.getDate().toString().padStart(2, '0')
+    const mes = (fecha.getMonth() + 1).toString().padStart(2, '0')
+    const anio = fecha.getFullYear()
+    const horas = fecha.getHours().toString().padStart(2, '0')
+    const minutos = fecha.getMinutes().toString().padStart(2, '0')
+    return `${dia}/${mes}/${anio} ${horas}:${minutos}`
+  }
+
   const getHoyFormato = () => {
     const ahora = new Date()
     const dia = ahora.getDate().toString().padStart(2, '0')
@@ -42,10 +53,14 @@ export default function EntradasSalidasPage() {
       const res = await fetch(`/api/entradas`)
       const data = await res.json()
       const hoy = getHoyFormato()
-      const entradasHoy = data.filter((e: Entrada) => {
+      const entradasConFecha = data.map((e: Entrada) => ({
+        ...e,
+        fechaEntrada: formatearFechaLocal(e.fechaEntrada),
+        fechaSalida: formatearFechaLocal(e.fechaSalida)
+      }))
+      const entradasHoy = entradasConFecha.filter((e: Entrada) => {
         if (!e.fechaEntrada) return false
-        const fechaSolo = e.fechaEntrada.split(' ')[0]
-        return fechaSolo === hoy
+        return e.fechaEntrada.split(' ')[0] === hoy
       })
       setEntradas(entradasHoy)
     } catch {
@@ -58,12 +73,10 @@ export default function EntradasSalidasPage() {
       const hoy = getHoyFormato()
       const res = await fetch(`/api/visitas`)
       const data = await res.json()
-
       const visitasHoy = data.filter((v: Visita) => {
         if (v.fecha !== hoy) return false
         return ['Pendiente', 'Confirmada', 'Rechazada'].includes(v.estatus)
       })
-
       setProximasVisitas(visitasHoy)
       const ahora = new Date()
       const minutos = ahora.getMinutes()

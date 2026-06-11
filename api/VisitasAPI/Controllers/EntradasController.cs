@@ -27,15 +27,11 @@ namespace VisitasAPI.Controllers
             var entradas = new List<object>();
             while (await reader.ReadAsync())
             {
-                var fechaEntrada = reader["fecha_entrada"] == DBNull.Value ? null :
-                    Convert.ToDateTime(reader["fecha_entrada"]).AddHours(-6).ToString("dd/MM/yyyy HH:mm");
-                var fechaSalida = reader["fecha_salida"] == DBNull.Value ? null :
-                    Convert.ToDateTime(reader["fecha_salida"]).AddHours(-6).ToString("dd/MM/yyyy HH:mm");
                 entradas.Add(new {
                     id = reader["id"],
                     visitaId = reader["visita_id"],
-                    fechaEntrada = fechaEntrada,
-                    fechaSalida = fechaSalida,
+                    fechaEntrada = reader["fecha_entrada"] == DBNull.Value ? null : Convert.ToDateTime(reader["fecha_entrada"]).ToString("o"),
+                    fechaSalida = reader["fecha_salida"] == DBNull.Value ? null : Convert.ToDateTime(reader["fecha_salida"]).ToString("o"),
                     estatus = reader["estatus"].ToString(),
                     nombreVisitante = reader["nombre_visitante"].ToString(),
                     personaVisitar = reader["persona_visitar"].ToString(),

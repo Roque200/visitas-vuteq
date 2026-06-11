@@ -45,7 +45,7 @@ namespace VisitasAPI.Controllers
         {
             using var con = _db.GetConnection();
             await con.OpenAsync();
-            string query = "UPDATE entradas_salidas SET fecha_salida = NOW(), estatus = 'Salio' WHERE id = @id";
+            string query = "UPDATE entradas_salidas SET fecha_salida = NOW() AT TIME ZONE 'America/Mexico_City', estatus = 'Salio' WHERE id = @id";
             using var cmd = new NpgsqlCommand(query, con);
             cmd.Parameters.AddWithValue("@id", id);
             await cmd.ExecuteNonQueryAsync();
